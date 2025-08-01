@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Recepção - Painel CRAS</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+<body>
+  <h1>Cadastro de Atendimento</h1>
+  <input type="text" id="nome" placeholder="Nome da pessoa">
+  <select id="profissional">
+    <option value="Psicólogo">Psicólogo</option>
+    <option value="Assistente Social">Assistente Social</option>
+    <option value="Cadastro Único">Cadastro Único</option>
+  </select>
+  <button onclick="cadastrar()">Cadastrar</button>
+
+  <script>
+    function cadastrar() {
+      const nome = document.getElementById('nome').value.trim();
+      const profissional = document.getElementById('profissional').value;
+      if (nome === "") return alert("Digite o nome");
+      const id = Date.now();
+      db.ref('fila/' + profissional + '/' + id).set({ nome });
+      document.getElementById('nome').value = "";
+    }
+  </script>
+</body>
+</html>

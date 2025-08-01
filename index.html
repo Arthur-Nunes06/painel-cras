@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>TV - Painel CRAS</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      color: white;
+      background: black;
+      overflow: hidden;
+    }
+    #video-bg {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
+    #painel {
+      text-align: center;
+      margin-top: 20vh;
+    }
+    h1 {
+      font-size: 4em;
+    }
+    h2 {
+      font-size: 3em;
+    }
+    #historico {
+      margin-top: 5vh;
+      font-size: 1.2em;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+<body>
+  <video id="video-bg" autoplay muted loop>
+    <source src="https://www.w3schools.com/howto/rain.mp4" type="video/mp4">
+  </video>
+
+  <div id="painel">
+    <h1 id="nome">Aguardando chamada...</h1>
+    <h2 id="profissional"></h2>
+  </div>
+
+  <div id="historico"></div>
+
+  <audio id="som" src="https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3"></audio>
+
+  <script>
+    const nomeEl = document.getElementById('nome');
+    const profEl = document.getElementById('profissional');
+    const historicoEl = document.getElementById('historico');
+    const som = document.getElementById('som');
+
+    db.ref('chamadaAtual').on('value', snap => {
+      const dados = snap.val();
+      if (!dados) return;
+
+      nomeEl.textContent = dados.nome;
+      profEl.textContent = dados.profissional;
+      som.play();
+
+      // Adiciona ao histórico visual
+      const item = document.createElement('div');
+      item.textContent = `✔️ ${dados.nome} - ${dados.profissional}`;
+      historicoEl.prepend(item);
+    });
+  </script>
+</body>
+</html>

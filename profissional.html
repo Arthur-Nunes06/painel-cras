@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Profissional - Painel CRAS</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+<body>
+  <h1>Chamada de Atendimento</h1>
+  <select id="profissional">
+    <option value="Psicólogo">Psicólogo</option>
+    <option value="Assistente Social">Assistente Social</option>
+    <option value="Cadastro Único">Cadastro Único</option>
+  </select>
+  <button onclick="chamar()">Chamar Próximo</button>
+
+  <script>
+    function chamar() {
+      const profissional = document.getElementById('profissional').value;
+      db.ref('fila/' + profissional).orderByKey().limitToFirst(1).once('value', snapshot => {
+        const data = snapshot.val();
+        if (!data) return alert("Nenhum nome na fila");
+
+        const id = Object.keys(data)[0];
+        const nome = data[id].nome;
+
+        db.ref('chamadaAtual').set({ nome, profissional });
+        db.ref('historico').push({ nome, profissional, timestamp: Date.now() });
+        db.ref('fila/' + profissional + '/' + id).remove();
+      });
+    }
+  </script>
+</body>
+</html>
