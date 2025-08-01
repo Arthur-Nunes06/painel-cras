@@ -2,21 +2,47 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Profissional - Chamada</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <title>Painel do Profissional</title>
+  <style>
+    body {
+      background-color: #0a3d62;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    select, button {
+      font-size: 1.2rem;
+      margin: 10px;
+      padding: 10px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+  </style>
 </head>
-<body style="font-family:sans-serif; text-align:center; padding:2em;">
-  <h1>Chamada de Atendimento</h1>
-  <select id="profissional" onchange="carregarFila()">
+<body>
+  <h1>Profissional - Chamar Pessoa</h1>
+
+  <label for="profissional">Selecione seu nome:</label>
+  <select id="profissional">
     <option value="Psicólogo Otiniel">Psicólogo Otiniel</option>
     <option value="Assistente Social Marlete">Assistente Social Marlete</option>
     <option value="Assistente Social Ana">Assistente Social Ana</option>
     <option value="Cadastro Único">Cadastro Único</option>
   </select>
 
-  <ul id="lista"></ul>
+  <button onclick="chamarProximo()">Chamar Próximo</button>
+
+  <p id="status"></p>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -28,39 +54,44 @@
       messagingSenderId: "279841059682",
       appId: "1:279841059682:web:be689ab69135f04cb4323b"
     };
+
     firebase.initializeApp(firebaseConfig);
-    firebase.auth().signInAnonymously();
+    const db = firebase.database();
 
-    function carregarFila() {
-      const prof = document.getElementById('profissional').value;
-      const lista = document.getElementById('lista');
-      lista.innerHTML = '';
+    firebase.auth().signInAnonymously().catch(error => {
+      document.getElementById("status").innerText = "Erro de autenticação: " + error.message;
+    });
 
-      const ref = firebase.database().ref('fila/' + prof);
-      ref.once('value', snapshot => {
-        const dados = snapshot.val();
-        if (dados) {
-          const chaves = Object.keys(dados).sort();
-          chaves.forEach(chave => {
-            const li = document.createElement('li');
-            li.textContent = dados[chave].nome;
-            li.style.cursor = 'pointer';
-            li.onclick = () => chamar(prof, chave, dados[chave].nome);
-            lista.appendChild(li);
-          });
-        } else {
-          lista.innerHTML = '<li>Sem pessoas na fila</li>';
+    function chamarProximo() {
+      const profissional = document.getElementById("profissional").value;
+      const filaRef = db.ref("fila/" + profissional);
+
+      filaRef.once("value", snapshot => {
+        const fila = snapshot.val();
+        if (!fila) {
+          document.getElementById("status").innerText = "Nenhum nome na fila.";
+          return;
         }
+
+        const chaves = Object.keys(fila).sort(); // mais antigo primeiro
+        const primeiraChave = chaves[0];
+        const nomeChamado = fila[primeiraChave].nome;
+
+        // Exibe o nome chamado
+        document.getElementById("status").innerText = `Chamando: ${nomeChamado}`;
+
+        // Remove da fila
+        filaRef.child(primeiraChave).remove();
+
+        // Atualiza último chamado
+        db.ref("ultimoChamado").set({
+          nome: nomeChamado,
+          profissional: profissional,
+          horario: new Date().toLocaleTimeString("pt-BR"),
+          data: new Date().toLocaleDateString("pt-BR")
+        });
       });
     }
-
-    function chamar(prof, chave, nome) {
-      firebase.database().ref('fila/' + prof + '/' + chave).remove();
-      firebase.database().ref('chamadoAtual').set({ nome, profissional: prof, hora: new Date().toLocaleTimeString() });
-      carregarFila();
-    }
-
-    window.onload = carregarFila;
   </script>
 </body>
 </html>
