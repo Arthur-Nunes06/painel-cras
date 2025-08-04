@@ -3,9 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Cadastro de Atendimento - CRAS</title>
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -37,6 +34,11 @@
       border-radius: 4px;
     }
   </style>
+
+  <!-- Firebase SDK - carregue ANTES do seu script -->
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
 </head>
 <body>
   <h1>Cadastro de Atendimento</h1>
@@ -151,8 +153,9 @@
         .catch(err => alert("Erro ao cadastrar usuário: " + err.message));
     }
 
-    // Carrega lista inicial
+    // Carrega lista inicial ao abrir a página
     carregarProfissionais();
   </script>
 </body>
 </html>
+
