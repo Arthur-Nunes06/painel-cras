@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painel do Profissional</title>
+</head>
+<body>
+  <h1>Painel do Profissional</h1>
+  <select id="profissional"></select>
+  <button onclick="chamarProximo()">Chamar Próximo</button>
+  <button onclick="finalizarChamada()">Finalizar Chamada</button>
+  <p id="status">Nenhuma chamada ativa</p>
+
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script>
+    firebase.auth().signInAnonymously();
+    const status = document.getElementById('status');
+    const profSelect = document.getElementById('profissional');
+
+    function carregarProfissionais() {
+      db.ref('profissionais').once('value', snap => {
+        const profs = snap.val();
+        profSelect.innerHTML = '';
+        for (let nome in profs) {
+          const opt = document.createElement('option');
+          opt.value = opt.textContent = nome;
+          profSelect.appendChild(opt);
+        }
+      });
+    }
+
+    function chamarProximo() {
+      const prof = profSelect.value;
+      const filaRef = db.ref('fila/' + prof);
+
+      filaRef.once('value', snap => {
+        const fila = snap.val();
+        if (!fila) return status.innerText = 'Fila vazia.';
+        const chaves = Object.keys(fila).sort();
+        const id = chaves[0];
+        const nome = fila[id].nome;
+        filaRef.child(id).remove();
+
+        const chamado = {
+          nome,
+          profissional: prof,
+          hora: new Date().toLocaleTimeString("pt-BR"),
+          data: new Date().toLocaleDateString("pt-BR")
+        };
+        db.ref('chamadoAtual').set(chamado);
+        db.ref('historicoChamadas').push(chamado);
+        status.innerText = `Chamando: ${nome}`;
+      });
+    }
+
+    function finalizarChamada() {
+      db.ref('chamadoAtual').remove();
+      status.innerText = 'Nenhuma chamada ativa';
+    }
+
+    carregarProfissionais();
+  </script>
+</body>
+</html>
