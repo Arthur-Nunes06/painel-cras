@@ -1,47 +1,67 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>Recepção - Cadastro</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <meta charset="UTF-8">
+  <title>Recepção CRAS</title>
 </head>
-<body style="font-family:sans-serif; text-align:center; padding:2em;">
+<body>
   <h1>Cadastro de Atendimento</h1>
-  <input type="text" id="nome" placeholder="Nome da pessoa" />
-  <select id="profissional">
-    <option value="Psicólogo Otiniel">Psicólogo Otiniel</option>
-    <option value="Assistente Social Marlete">Assistente Social Marlete</option>
-    <option value="Assistente Social Ana">Assistente Social Ana</option>
-    <option value="Cadastro Único">Cadastro Único</option>
-  </select>
+  <input type="text" id="nome" placeholder="Nome da pessoa">
+  <select id="profissional"></select>
   <button onclick="cadastrar()">Cadastrar</button>
 
+  <h2>Profissionais</h2>
+  <input type="text" id="novoProf" placeholder="Novo profissional">
+  <button onclick="adicionarProf()">Adicionar</button>
+  <button onclick="removerProf()">Remover Selecionado</button>
+
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
-      authDomain: "painelcras-4890c.firebaseapp.com",
-      databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
-      projectId: "painelcras-4890c",
-      storageBucket: "painelcras-4890c.appspot.com",
-      messagingSenderId: "279841059682",
-      appId: "1:279841059682:web:be689ab69135f04cb4323b"
-    };
-    firebase.initializeApp(firebaseConfig);
     firebase.auth().signInAnonymously();
+
+    const profSelect = document.getElementById('profissional');
+
+    function carregarProfissionais() {
+      profSelect.innerHTML = '';
+      db.ref('profissionais').once('value', snap => {
+        const profs = snap.val();
+        for (let nome in profs) {
+          const opt = document.createElement('option');
+          opt.value = opt.textContent = nome;
+          profSelect.appendChild(opt);
+        }
+      });
+    }
 
     function cadastrar() {
       const nome = document.getElementById('nome').value.trim();
-      const prof = document.getElementById('profissional').value;
-      if (!nome) return alert('Digite o nome');
+      const prof = profSelect.value;
+      if (!nome || !prof) return alert('Preencha todos os campos');
 
-      const filaRef = firebase.database().ref('fila/' + prof);
-      const id = Date.now();
-      filaRef.child(id).set({ nome });
-      alert('Cadastro realizado!');
+      db.ref('fila/' + prof + '/' + Date.now()).set({ nome });
+      alert('Cadastrado!');
       document.getElementById('nome').value = '';
     }
+
+    function adicionarProf() {
+      const nome = document.getElementById('novoProf').value.trim();
+      if (!nome) return;
+      db.ref('profissionais/' + nome).set(true).then(() => {
+        carregarProfissionais();
+        document.getElementById('novoProf').value = '';
+      });
+    }
+
+    function removerProf() {
+      const prof = profSelect.value;
+      if (!prof) return;
+      db.ref('profissionais/' + prof).remove().then(carregarProfissionais);
+    }
+
+    carregarProfissionais();
   </script>
 </body>
 </html>
