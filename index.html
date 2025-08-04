@@ -2,39 +2,40 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Cadastro de Atendimento</title>
+  <title>Cadastro e Profissionais</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 2em;
-    }
-    input, select, button {
-      font-size: 1.2rem;
-      padding: 0.5em;
-      margin: 0.5em;
-      width: 250px;
-    }
+    body { font-family: sans-serif; max-width: 500px; margin: auto; padding: 2em; }
+    input, select, button { font-size: 1rem; margin: 0.5em 0; padding: 0.5em; width: 100%; }
+    button { cursor: pointer; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 0.3em 0; background: #eee; padding: 0.3em 0.5em; display: flex; justify-content: space-between; align-items: center; }
+    li button { background: crimson; border: none; color: white; cursor: pointer; padding: 0 0.5em; border-radius: 3px; }
+    .msg { margin: 1em 0; color: green; }
   </style>
 </head>
 <body>
-  <h1>Cadastro de Atendimento</h1>
+  <h1>Cadastro de Usuário na Fila</h1>
 
-  <input type="text" id="nome" placeholder="Nome da pessoa" />
-  <br />
-  <select id="profissional"></select>
-  <br />
-  <button onclick="cadastrar()">Cadastrar na Fila</button>
+  <input type="text" id="nomeUsuario" placeholder="Nome do usuário" />
+  <select id="selectProfissional"></select>
+  <button onclick="cadastrarUsuario()">Cadastrar na Fila</button>
 
-  <p id="msg"></p>
+  <div class="msg" id="msgUsuario"></div>
+
+  <hr />
+
+  <h2>Gerenciar Profissionais</h2>
+  <input type="text" id="novoProfissional" placeholder="Nome do profissional" />
+  <button onclick="adicionarProfissional()">Adicionar Profissional</button>
+
+  <ul id="listaProfissionais"></ul>
+  <div class="msg" id="msgProfissional"></div>
 
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
-
   <script>
-    // Config Firebase (confira se está igual ao seu)
     const firebaseConfig = {
       apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
       authDomain: "painelcras-4890c.firebaseapp.com",
@@ -47,65 +48,103 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Login anônimo
-    firebase.auth().signInAnonymously().catch(e => {
-      document.getElementById('msg').textContent = "Erro de autenticação: " + e.message;
-    });
+    firebase.auth().signInAnonymously().catch(e => alert("Erro auth: " + e.message));
 
-    const profissionalSelect = document.getElementById('profissional');
-    const msg = document.getElementById('msg');
+    const selectProfissional = document.getElementById('selectProfissional');
+    const listaProfissionais = document.getElementById('listaProfissionais');
+    const msgUsuario = document.getElementById('msgUsuario');
+    const msgProfissional = document.getElementById('msgProfissional');
 
-    // Carregar profissionais do banco e popular select
+    // Carregar profissionais
     function carregarProfissionais() {
-      db.ref('profissionais').once('value')
-        .then(snapshot => {
-          const profs = snapshot.val();
-          profissionalSelect.innerHTML = '';
-          if (!profs) {
-            profissionalSelect.innerHTML = '<option disabled>Sem profissionais cadastrados</option>';
-            return;
-          }
-          Object.entries(profs).forEach(([key, nome]) => {
-            const opt = document.createElement('option');
-            opt.value = nome;
-            opt.textContent = nome;
-            profissionalSelect.appendChild(opt);
-          });
-        })
-        .catch(err => {
-          msg.textContent = "Erro ao carregar profissionais: " + err.message;
+      db.ref('profissionais').once('value').then(snapshot => {
+        const profs = snapshot.val() || {};
+        selectProfissional.innerHTML = '';
+        listaProfissionais.innerHTML = '';
+
+        Object.entries(profs).forEach(([id, nome]) => {
+          // option no select
+          const opt = document.createElement('option');
+          opt.value = nome;
+          opt.textContent = nome;
+          selectProfissional.appendChild(opt);
+
+          // item na lista com botão remover
+          const li = document.createElement('li');
+          li.textContent = nome;
+          const btnRemover = document.createElement('button');
+          btnRemover.textContent = "X";
+          btnRemover.onclick = () => removerProfissional(id);
+          li.appendChild(btnRemover);
+          listaProfissionais.appendChild(li);
         });
+
+        if (selectProfissional.options.length === 0) {
+          selectProfissional.innerHTML = '<option disabled>Sem profissionais cadastrados</option>';
+        }
+      }).catch(e => {
+        msgProfissional.textContent = 'Erro ao carregar profissionais: ' + e.message;
+      });
     }
 
     carregarProfissionais();
 
-    function cadastrar() {
-      const nome = document.getElementById('nome').value.trim();
-      const profissional = profissionalSelect.value;
+    // Adicionar profissional
+    function adicionarProfissional() {
+      const nome = document.getElementById('novoProfissional').value.trim();
+      if (!nome) {
+        alert("Digite o nome do profissional");
+        return;
+      }
+      const novoRef = db.ref('profissionais').push();
+      novoRef.set(nome)
+        .then(() => {
+          msgProfissional.textContent = `Profissional "${nome}" adicionado!`;
+          document.getElementById('novoProfissional').value = '';
+          carregarProfissionais();
+        })
+        .catch(e => {
+          msgProfissional.textContent = 'Erro ao adicionar profissional: ' + e.message;
+        });
+    }
+
+    // Remover profissional
+    function removerProfissional(id) {
+      if (!confirm("Remover profissional?")) return;
+      db.ref('profissionais/' + id).remove()
+        .then(() => {
+          msgProfissional.textContent = 'Profissional removido.';
+          carregarProfissionais();
+        })
+        .catch(e => {
+          msgProfissional.textContent = 'Erro ao remover: ' + e.message;
+        });
+    }
+
+    // Cadastrar usuário na fila
+    function cadastrarUsuario() {
+      const nome = document.getElementById('nomeUsuario').value.trim();
+      const profissional = selectProfissional.value;
 
       if (!nome) {
-        alert("Digite o nome da pessoa.");
+        alert("Digite o nome do usuário");
         return;
       }
       if (!profissional) {
-        alert("Selecione um profissional.");
+        alert("Selecione um profissional");
         return;
       }
 
-      // Referência da fila do profissional
       const filaRef = db.ref('fila/' + profissional);
-
-      // Gerar ID único com timestamp
       const id = Date.now().toString();
 
-      // Gravar na fila
       filaRef.child(id).set({ nome })
         .then(() => {
-          msg.textContent = `Cadastro realizado: ${nome} para ${profissional}`;
-          document.getElementById('nome').value = '';
+          msgUsuario.textContent = `Usuário "${nome}" cadastrado na fila de ${profissional}`;
+          document.getElementById('nomeUsuario').value = '';
         })
         .catch(e => {
-          msg.textContent = "Erro ao cadastrar: " + e.message;
+          msgUsuario.textContent = 'Erro ao cadastrar: ' + e.message;
         });
     }
   </script>
