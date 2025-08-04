@@ -1,66 +1,76 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>TV - Painel de Chamadas</title>
+  <meta charset="UTF-8">
+  <title>Painel TV</title>
   <style>
     body {
       margin: 0;
+      display: flex;
+      height: 100vh;
       background: black;
       color: white;
       font-family: sans-serif;
-      text-align: center;
     }
-    video {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: -1;
+    .video {
+      flex: 1;
     }
-    .chamada {
-      margin-top: 20%;
-      font-size: 3em;
-      background: rgba(0,0,0,0.5);
-      padding: 1em;
-      border-radius: 20px;
-      display: inline-block;
+    .info {
+      flex: 1;
+      padding: 2em;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .info h1, .info ul {
+      margin-bottom: 2em;
     }
   </style>
 </head>
 <body>
-  <video autoplay loop muted>
-    <source src="https://www.w3schools.com/howto/rain.mp4" type="video/mp4" />
-  </video>
-  <div class="chamada" id="chamada">Aguardando chamada...</div>
-  <audio id="som" src="https://www.soundjay.com/buttons/sounds/beep-07.mp3" preload="auto"></audio>
+  <div class="video">
+    <iframe width="100%" height="100%" src="https://www.youtube.com/embed/OPtRHSv2huE?autoplay=1&mute=1&controls=0&loop=1&playlist=OPtRHSv2huE" frameborder="0" allowfullscreen></iframe>
+  </div>
+  <div class="info">
+    <h1 id="chamadaAtual">Aguardando chamada...</h1>
+    <h2>Últimas 5 chamadas:</h2>
+    <ul id="ultimosChamados"></ul>
+    <audio id="som" src="assets/beep.mp3" preload="auto"></audio>
+  </div>
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
-      authDomain: "painelcras-4890c.firebaseapp.com",
-      databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
-      projectId: "painelcras-4890c",
-      storageBucket: "painelcras-4890c.appspot.com",
-      messagingSenderId: "279841059682",
-      appId: "1:279841059682:web:be689ab69135f04cb4323b"
-    };
-    firebase.initializeApp(firebaseConfig);
     firebase.auth().signInAnonymously();
-
-    const chamada = document.getElementById('chamada');
+    const chamadaEl = document.getElementById('chamadaAtual');
+    const listaEl = document.getElementById('ultimosChamados');
     const som = document.getElementById('som');
+    let ultimoNome = '';
 
-    firebase.database().ref('chamadoAtual').on('value', snapshot => {
-      const dados = snapshot.val();
-      if (dados) {
-        chamada.innerHTML = `<strong>${dados.nome}</strong><br><em>${dados.profissional}</em><br>${dados.hora}`;
+    db.ref('chamadoAtual').on('value', snap => {
+      const dados = snap.val();
+      if (dados && dados.nome !== ultimoNome) {
+        chamadaEl.innerText = `${dados.nome} - ${dados.profissional}`;
         som.play();
+        ultimoNome = dados.nome;
+      } else if (!dados) {
+        chamadaEl.innerText = 'Aguardando chamada...';
+        ultimoNome = '';
+      }
+    });
+
+    db.ref('historicoChamadas').limitToLast(5).on('value', snap => {
+      const list = snap.val();
+      listaEl.innerHTML = '';
+      if (list) {
+        const arr = Object.values(list).reverse();
+        arr.forEach(d => {
+          const li = document.createElement('li');
+          li.textContent = `${d.nome} (${d.profissional}) - ${d.hora}`;
+          listaEl.appendChild(li);
+        });
       }
     });
   </script>
