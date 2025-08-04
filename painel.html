@@ -3,131 +3,66 @@
 <head>
   <meta charset="UTF-8" />
   <title>Painel do Profissional</title>
-  <style>
-    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1em; }
-    select, button { font-size: 1.2rem; padding: 0.5em; margin-top: 1em; width: 100%; }
-    #status { margin-top: 2em; font-size: 1.5rem; min-height: 2em; }
-  </style>
 </head>
-<body>
-
-  <h1>Painel do Profissional</h1>
-  <label for="selectProfissional">Selecione seu nome:</label>
-  <select id="selectProfissional"></select>
-
-  <button id="btnChamar">Chamar Próximo</button>
-  <button id="btnFinalizar" disabled>Finalizar Chamada</button>
-
-  <div id="status">Aguardando chamada...</div>
+<body style="font-family:sans-serif; text-align:center; padding:2em;">
+  <h1>Profissional - Chamar Próximo</h1>
+  <select id="profissional"></select>
+  <button onclick="chamarProximo()">Chamar</button>
+  <p id="status"></p>
 
   <script type="module">
     import { db } from './firebase-config.js';
-    import { ref, onValue, remove, set } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
+    import {
+      ref, onValue, remove, set, get, child
+    } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
 
-    const selectProfissional = document.getElementById('selectProfissional');
-    const statusEl = document.getElementById('status');
-    const btnChamar = document.getElementById('btnChamar');
-    const btnFinalizar = document.getElementById('btnFinalizar');
+    const profissionalSel = document.getElementById('profissional');
+    const status = document.getElementById('status');
 
-    let profissionalSelecionado = '';
-    let chamadoAtual = null;
-
-    // Carregar profissionais para select
-    const profRef = ref(db, 'profissionais');
-    onValue(profRef, (snapshot) => {
-      const profs = snapshot.val() || {};
-      selectProfissional.innerHTML = '';
-      for (const nome of Object.values(profs)) {
-        const opt = document.createElement('option');
-        opt.value = nome;
-        opt.textContent = nome;
-        selectProfissional.appendChild(opt);
-      }
-    });
-
-    selectProfissional.onchange = () => {
-      profissionalSelecionado = selectProfissional.value;
-      statusEl.textContent = 'Aguardando chamada...';
-      chamadoAtual = null;
-      btnFinalizar.disabled = true;
-    };
-
-    btnChamar.onclick = () => {
-      if (!profissionalSelecionado) {
-        alert('Selecione um profissional.');
-        return;
-      }
-      const filaRef = ref(db, `fila/${profissionalSelecionado}`);
-
-      // Buscar fila do profissional
-      onValue(filaRef, (snapshot) => {
-        const fila = snapshot.val();
-        if (!fila) {
-          statusEl.textContent = 'Nenhum usuário na fila.';
-          return;
-        }
-        const chaves = Object.keys(fila).sort();
-        const primeiraChave = chaves[0];
-        const usuario = fila[primeiraChave].nome;
-
-        chamadoAtual = { chave: primeiraChave, nome: usuario, profissional: profissionalSelecionado };
-        statusEl.textContent = `Chamando: ${usuario}`;
-
-        // Atualiza o chamadoAtual no banco
-        set(ref(db, 'chamadoAtual'), {
-          nome: usuario,
-          profissional: profissionalSelecionado,
-          hora: new Date().toLocaleTimeString('pt-BR'),
-          timestamp: Date.now()
+    function carregarProfissionais() {
+      const profRef = ref(db, 'profissionais');
+      onValue(profRef, (snap) => {
+        profissionalSel.innerHTML = '';
+        snap.forEach(child => {
+          const option = document.createElement('option');
+          option.value = child.val();
+          option.textContent = child.val();
+          profissionalSel.appendChild(option);
         });
-        btnFinalizar.disabled = false;
+      });
+    }
 
-        // Remover da fila
-        remove(ref(db, `fila/${profissionalSelecionado}/${primeiraChave}`));
-      }, { onlyOnce: true });
-    };
-
-    btnFinalizar.onclick = () => {
-      if (!chamadoAtual) {
-        alert('Nenhuma chamada para finalizar.');
+    async function chamarProximo() {
+      const profissional = profissionalSel.value;
+      const filaRef = ref(db, `fila/${profissional}`);
+      const snapshot = await get(filaRef);
+      const fila = snapshot.val();
+      if (!fila) {
+        status.textContent = 'Nenhum usuário na fila.';
         return;
       }
-      // Adiciona na lista ultimas chamadas
-      const ultChamadasRef = ref(db, 'ultimasChamadas');
-      const novaChamada = {
-        nome: chamadoAtual.nome,
-        profissional: chamadoAtual.profissional,
-        hora: new Date().toLocaleTimeString('pt-BR'),
-        data: new Date().toLocaleDateString('pt-BR'),
-        timestamp: Date.now()
-      };
 
-      // Obter últimas chamadas, adicionar nova e limitar a 5
-      onValue(ultChamadasRef, (snapshot) => {
-        let ultimas = snapshot.val() || [];
-        ultimas = ultimas.filter(ch => ch.timestamp !== undefined);
-        ultimas.push(novaChamada);
-        ultimas.sort((a,b) => b.timestamp - a.timestamp);
-        if (ultimas.length > 5) ultimas.pop();
-        set(ultChamadasRef, ultimas);
-      }, { onlyOnce: true });
+      const chaves = Object.keys(fila).sort();
+      const primeira = chaves[0];
+      const nome = fila[primeira].nome;
 
-      statusEl.textContent = 'Chamada finalizada.';
-      btnFinalizar.disabled = true;
-      chamadoAtual = null;
+      status.textContent = `Chamando: ${nome}`;
 
-      // Limpa chamadoAtual no banco
-      set(ref(db, 'chamadoAtual'), null);
-    };
+      await remove(ref(db, `fila/${profissional}/${primeira}`));
+      await set(ref(db, 'chamadoAtual'), {
+        nome, profissional, hora: new Date().toLocaleTimeString()
+      });
 
-    // Inicializa seleção e estado
-    setTimeout(() => {
-      if (selectProfissional.options.length > 0) {
-        selectProfissional.selectedIndex = 0;
-        profissionalSelecionado = selectProfissional.value;
-      }
-    }, 500);
+      // Armazena nas últimas 5 chamadas
+      const ultimasRef = ref(db, 'ultimasChamadas');
+      const ultSnap = await get(ultimasRef);
+      const ultimas = ultSnap.val() || [];
+      ultimas.push({ nome, profissional, hora: new Date().toLocaleTimeString() });
+      if (ultimas.length > 5) ultimas.shift();
+      await set(ultimasRef, ultimas);
+    }
+
+    carregarProfissionais();
   </script>
-
 </body>
 </html>
