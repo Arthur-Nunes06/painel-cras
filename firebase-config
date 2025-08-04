@@ -19,4 +19,4 @@ const auth = getAuth(app);
 
 signInAnonymously(auth).catch(console.error);
 
-export { db, auth };
+export { db };
