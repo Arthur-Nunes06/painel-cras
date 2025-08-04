@@ -153,8 +153,11 @@
           const btnRemover = document.createElement('button');
           btnRemover.textContent = 'Excluir';
           btnRemover.onclick = () => {
-            if (confirm(`Deseja realmente excluir o profissional "${nomeProf}"?`)) {
-              db.ref('profissionais/' + key).remove();
+            if (confirm(`Deseja realmente excluir o profissional "${nomeProf}"? Isso removerá usuários na fila deste profissional.`)) {
+              // Remove usuários na fila desse profissional
+              db.ref('fila/' + nomeProf).remove()
+                .then(() => db.ref('profissionais/' + key).remove())
+                .catch(e => alert('Erro ao remover profissional: ' + e.message));
             }
           };
 
