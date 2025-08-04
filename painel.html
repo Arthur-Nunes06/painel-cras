@@ -1,67 +1,156 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Painel do Profissional</title>
+  <style>
+    body {
+      background-color: #0a3d62;
+      color: white;
+      font-family: sans-serif;
+      max-width: 500px;
+      margin: auto;
+      padding: 2em;
+      text-align: center;
+    }
+    select, button {
+      font-size: 1.2rem;
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.5rem;
+      min-height: 60px;
+    }
+    #finalizar {
+      background-color: #eb3b5a;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-  <h1>Painel do Profissional</h1>
+  <h1>Profissional - Chamar Pessoa</h1>
+
+  <label for="profissional">Selecione seu nome:</label>
   <select id="profissional"></select>
-  <button onclick="chamarProximo()">Chamar Próximo</button>
-  <button onclick="finalizarChamada()">Finalizar Chamada</button>
-  <p id="status">Nenhuma chamada ativa</p>
+
+  <button id="btn-chamar">Chamar Próximo</button>
+  <button id="btn-finalizar" disabled>Finalizar Chamada</button>
+
+  <p id="status">Nenhum chamado</p>
 
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
-  <script src="firebase-config.js"></script>
   <script>
-    firebase.auth().signInAnonymously();
-    const status = document.getElementById('status');
-    const profSelect = document.getElementById('profissional');
+    const firebaseConfig = {
+      apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
+      authDomain: "painelcras-4890c.firebaseapp.com",
+      databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
+      projectId: "painelcras-4890c",
+      storageBucket: "painelcras-4890c.appspot.com",
+      messagingSenderId: "279841059682",
+      appId: "1:279841059682:web:be689ab69135f04cb4323b"
+    };
 
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    firebase.auth().signInAnonymously().catch(console.error);
+
+    const profissionalSelect = document.getElementById('profissional');
+    const btnChamar = document.getElementById('btn-chamar');
+    const btnFinalizar = document.getElementById('btn-finalizar');
+    const status = document.getElementById('status');
+
+    let chamadoAtual = null;
+
+    // Carrega profissionais para select
     function carregarProfissionais() {
-      db.ref('profissionais').once('value', snap => {
-        const profs = snap.val();
-        profSelect.innerHTML = '';
-        for (let nome in profs) {
+      db.ref('profissionais').once('value').then(snapshot => {
+        const profs = snapshot.val() || {};
+        profissionalSelect.innerHTML = '';
+        for (const id in profs) {
           const opt = document.createElement('option');
-          opt.value = opt.textContent = nome;
-          profSelect.appendChild(opt);
+          opt.value = profs[id]; // valor é nome do profissional
+          opt.textContent = profs[id];
+          profissionalSelect.appendChild(opt);
+        }
+        if (profissionalSelect.options.length === 0) {
+          profissionalSelect.innerHTML = '<option disabled>Sem profissionais cadastrados</option>';
+          btnChamar.disabled = true;
+        } else {
+          btnChamar.disabled = false;
         }
       });
     }
 
-    function chamarProximo() {
-      const prof = profSelect.value;
-      const filaRef = db.ref('fila/' + prof);
-
-      filaRef.once('value', snap => {
-        const fila = snap.val();
-        if (!fila) return status.innerText = 'Fila vazia.';
-        const chaves = Object.keys(fila).sort();
-        const id = chaves[0];
-        const nome = fila[id].nome;
-        filaRef.child(id).remove();
-
-        const chamado = {
-          nome,
-          profissional: prof,
-          hora: new Date().toLocaleTimeString("pt-BR"),
-          data: new Date().toLocaleDateString("pt-BR")
-        };
-        db.ref('chamadoAtual').set(chamado);
-        db.ref('historicoChamadas').push(chamado);
-        status.innerText = `Chamando: ${nome}`;
-      });
-    }
-
-    function finalizarChamada() {
-      db.ref('chamadoAtual').remove();
-      status.innerText = 'Nenhuma chamada ativa';
-    }
-
     carregarProfissionais();
+
+    btnChamar.onclick = () => {
+      const prof = profissionalSelect.value;
+      if (!prof) return alert('Selecione um profissional');
+
+      const filaRef = db.ref('fila/' + prof);
+      filaRef.orderByKey().limitToFirst(1).once('value').then(snapshot => {
+        const fila = snapshot.val();
+        if (!fila) {
+          status.textContent = 'Nenhum nome na fila.';
+          chamadoAtual = null;
+          btnFinalizar.disabled = true;
+          return;
+        }
+        const key = Object.keys(fila)[0];
+        const nomeChamado = fila[key].nome;
+
+        // Mostra nome chamado e ativa botão finalizar
+        status.innerHTML = `Chamando: <strong>${nomeChamado}</strong>`;
+        chamadoAtual = { key, nome: nomeChamado, profissional: prof };
+
+        btnFinalizar.disabled = false;
+
+        // Atualiza nó chamadoAtual para o painel TV
+        db.ref('chamadoAtual').set({
+          nome: nomeChamado,
+          profissional: prof,
+          hora: new Date().toLocaleTimeString('pt-BR'),
+          data: new Date().toLocaleDateString('pt-BR')
+        });
+      });
+    };
+
+    btnFinalizar.onclick = () => {
+      if (!chamadoAtual) return;
+      const { key, profissional, nome } = chamadoAtual;
+
+      // Remove da fila
+      db.ref('fila/' + profissional + '/' + key).remove()
+        .then(() => {
+          // Atualiza últimas 5 chamadas
+          const ultimasRef = db.ref('ultimasChamadas');
+          ultimasRef.once('value').then(snap => {
+            let ultimas = snap.val() || [];
+            ultimas.unshift({
+              nome,
+              profissional,
+              horario: new Date().toLocaleTimeString('pt-BR'),
+              data: new Date().toLocaleDateString('pt-BR')
+            });
+            if (ultimas.length > 5) ultimas.pop();
+            return ultimasRef.set(ultimas);
+          });
+
+          status.textContent = 'Chamada finalizada.';
+          btnFinalizar.disabled = true;
+          chamadoAtual = null;
+
+          // Limpa chamadoAtual no db para painel TV
+          db.ref('chamadoAtual').remove();
+        });
+    };
   </script>
 </body>
 </html>
