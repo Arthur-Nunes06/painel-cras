@@ -4,64 +4,68 @@
   <meta charset="UTF-8" />
   <title>TV - Painel de Chamadas</title>
   <style>
-    body, html {
-      margin: 0; height: 100%;
+    body {
+      margin: 0;
       font-family: sans-serif;
-      display: flex;
-      background: black;
+      background-color: #222;
       color: white;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
     }
     #video-container {
-      flex: 1;
+      width: 50%;
+      height: 100vh;
+      background: black;
     }
-    #video-container iframe {
+    iframe {
       width: 100%;
       height: 100%;
       border: none;
     }
-    #info {
-      flex: 1;
+    #info-container {
+      width: 50%;
       padding: 2em;
+      box-sizing: border-box;
       background: #0a3d62;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
     }
-    #chamadaAtual {
+    #chamadoAtual {
       font-size: 2.5rem;
-      margin-bottom: 2em;
+      font-weight: bold;
+      margin-bottom: 1em;
     }
     #ultimasChamadas {
-      flex-grow: 1;
-      overflow-y: auto;
+      margin-top: auto;
     }
-    #ultimasChamadas h3 {
+    #ultimasChamadas h2 {
       margin-bottom: 0.5em;
     }
     #ultimasChamadas ul {
       list-style: none;
-      padding: 0;
-      margin: 0;
+      padding-left: 0;
+      max-height: 300px;
+      overflow-y: auto;
     }
     #ultimasChamadas li {
-      background: rgba(255 255 255 / 0.1);
       margin-bottom: 0.5em;
-      padding: 0.3em 0.5em;
-      border-radius: 5px;
+      font-size: 1.1rem;
+      border-bottom: 1px solid #0e2a56;
+      padding-bottom: 0.3em;
     }
   </style>
 </head>
 <body>
-
   <div id="video-container">
-    <iframe src="https://www.youtube.com/embed/OPtRHSv2huE?autoplay=1&loop=1&playlist=OPtRHSv2huE&mute=1" allow="autoplay" allowfullscreen></iframe>
+    <iframe src="https://www.youtube.com/embed/OPtRHSv2huE?autoplay=1&mute=1&loop=1&playlist=OPtRHSv2huE" allow="autoplay" allowfullscreen></iframe>
   </div>
-
-  <div id="info">
-    <div id="chamadaAtual">Aguardando chamada...</div>
+  <div id="info-container">
+    <div id="chamadoAtual">Aguardando chamada...</div>
     <div id="ultimasChamadas">
-      <h3>Últimas 5 chamadas:</h3>
-      <ul id="listaChamadas"></ul>
+      <h2>Últimas 5 chamadas</h2>
+      <ul></ul>
     </div>
   </div>
 
@@ -69,6 +73,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
+
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
@@ -82,45 +87,32 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    firebase.auth().signInAnonymously();
+    firebase.auth().signInAnonymously().catch(console.error);
 
-    const chamadaAtualDiv = document.getElementById('chamadaAtual');
-    const listaChamadasUl = document.getElementById('listaChamadas');
+    const chamadoAtualDiv = document.getElementById('chamadoAtual');
+    const ultimasUl = document.querySelector('#ultimasChamadas ul');
 
-    // Atualiza chamada atual
+    // Atualiza o chamado atual na tela
     db.ref('chamadoAtual').on('value', snapshot => {
-      const dado = snapshot.val();
-      if (dado) {
-        chamadaAtualDiv.innerHTML = `<strong>${dado.nome}</strong><br><em>${dado.profissional}</em><br>${dado.hora}`;
-      } else {
-        chamadaAtualDiv.textContent = "Aguardando chamada...";
+      const data = snapshot.val();
+      if (!data) {
+        chamadoAtualDiv.textContent = "Aguardando chamada...";
+        return;
       }
+      chamadoAtualDiv.textContent = `Chamando: ${data.nome} (Profissional: ${data.profissional}) às ${data.hora}`;
     });
 
-    // Carregar últimas 5 chamadas de todos os profissionais (ordenar pela data/hora)
-    db.ref('historicoChamadas').on('value', snapshot => {
-      const dados = snapshot.val() || {};
-      let todasChamadas = [];
-      Object.values(dados).forEach(profissionalChamadas => {
-        Object.values(profissionalChamadas).forEach(chamada => {
-          todasChamadas.push(chamada);
-        });
-      });
-
-      // Ordena desc por data + hora (simplificando pelo timestamp inserido no Firebase seria melhor)
-      todasChamadas.sort((a, b) => {
-        const timeA = new Date(a.data + ' ' + a.hora).getTime();
-        const timeB = new Date(b.data + ' ' + b.hora).getTime();
-        return timeB - timeA;
-      });
-
-      const ultimas5 = todasChamadas.slice(0,5);
-
-      listaChamadasUl.innerHTML = '';
-      ultimas5.forEach(ch => {
+    // Atualiza últimas chamadas (limitando a 5)
+    db.ref('ultimasChamadas').on('value', snapshot => {
+      const chamadas = snapshot.val() || {};
+      // Ordena pela hora ou pela chave que é push id (ordem cronológica)
+      const lista = Object.values(chamadas);
+      // Últimos 5 já estão limitados no push do painel
+      ultimasUl.innerHTML = '';
+      lista.forEach(item => {
         const li = document.createElement('li');
-        li.textContent = `${ch.nome} — ${ch.profissional} — ${ch.hora} ${ch.data}`;
-        listaChamadasUl.appendChild(li);
+        li.textContent = `${item.nome} - ${item.profissional} (${item.hora})`;
+        ultimasUl.appendChild(li);
       });
     });
   </script>
