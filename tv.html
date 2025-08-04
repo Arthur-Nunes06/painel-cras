@@ -5,83 +5,67 @@
   <title>TV - Painel de Chamadas</title>
   <style>
     body, html {
-      margin: 0; padding: 0; height: 100%;
+      margin: 0; height: 100%;
       font-family: sans-serif;
+      display: flex;
       background: black;
       color: white;
-      display: flex;
-      flex-direction: row;
-      overflow: hidden;
     }
     #video-container {
       flex: 1;
-      position: relative;
     }
     #video-container iframe {
       width: 100%;
       height: 100%;
       border: none;
     }
-    #painel-chamadas {
+    #info {
       flex: 1;
-      background: #111;
-      padding: 20px;
-      box-sizing: border-box;
+      padding: 2em;
+      background: #0a3d62;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
     }
-    #chamada-atual {
-      font-size: 2rem;
-      margin-bottom: 30px;
-      border-bottom: 1px solid #444;
-      padding-bottom: 20px;
-    }
-    #chamada-atual strong {
+    #chamadaAtual {
       font-size: 2.5rem;
-      color: #00ff99;
+      margin-bottom: 2em;
     }
-    #ultimas-chamadas {
-      flex: 1;
+    #ultimasChamadas {
+      flex-grow: 1;
       overflow-y: auto;
     }
-    #ultimas-chamadas h2 {
-      margin-top: 0;
-      border-bottom: 1px solid #444;
-      padding-bottom: 10px;
+    #ultimasChamadas h3 {
+      margin-bottom: 0.5em;
     }
-    #ultimas-chamadas ul {
+    #ultimasChamadas ul {
       list-style: none;
       padding: 0;
       margin: 0;
     }
-    #ultimas-chamadas li {
-      margin-bottom: 10px;
-      font-size: 1.2rem;
-      border-bottom: 1px solid #222;
-      padding-bottom: 8px;
+    #ultimasChamadas li {
+      background: rgba(255 255 255 / 0.1);
+      margin-bottom: 0.5em;
+      padding: 0.3em 0.5em;
+      border-radius: 5px;
     }
   </style>
 </head>
 <body>
+
   <div id="video-container">
-    <iframe
-      src="https://www.youtube.com/embed/OPtRHSv2huE?autoplay=1&loop=1&playlist=OPtRHSv2huE&mute=1"
-      allow="autoplay"
-      allowfullscreen
-      title="Vídeo YouTube"
-    ></iframe>
+    <iframe src="https://www.youtube.com/embed/OPtRHSv2huE?autoplay=1&loop=1&playlist=OPtRHSv2huE&mute=1" allow="autoplay" allowfullscreen></iframe>
   </div>
-  <div id="painel-chamadas">
-    <div id="chamada-atual">
-      Aguardando chamada...
-    </div>
-    <div id="ultimas-chamadas">
-      <h2>Últimas 5 Chamadas</h2>
-      <ul id="lista-ultimas"></ul>
+
+  <div id="info">
+    <div id="chamadaAtual">Aguardando chamada...</div>
+    <div id="ultimasChamadas">
+      <h3>Últimas 5 chamadas:</h3>
+      <ul id="listaChamadas"></ul>
     </div>
   </div>
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
@@ -92,4 +76,53 @@
       databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
       projectId: "painelcras-4890c",
       storageBucket: "painelcras-4890c.appspot.com",
-      messagingSenderId: "279841
+      messagingSenderId: "279841059682",
+      appId: "1:279841059682:web:be689ab69135f04cb4323b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    firebase.auth().signInAnonymously();
+
+    const chamadaAtualDiv = document.getElementById('chamadaAtual');
+    const listaChamadasUl = document.getElementById('listaChamadas');
+
+    // Atualiza chamada atual
+    db.ref('chamadoAtual').on('value', snapshot => {
+      const dado = snapshot.val();
+      if (dado) {
+        chamadaAtualDiv.innerHTML = `<strong>${dado.nome}</strong><br><em>${dado.profissional}</em><br>${dado.hora}`;
+      } else {
+        chamadaAtualDiv.textContent = "Aguardando chamada...";
+      }
+    });
+
+    // Carregar últimas 5 chamadas de todos os profissionais (ordenar pela data/hora)
+    db.ref('historicoChamadas').on('value', snapshot => {
+      const dados = snapshot.val() || {};
+      let todasChamadas = [];
+      Object.values(dados).forEach(profissionalChamadas => {
+        Object.values(profissionalChamadas).forEach(chamada => {
+          todasChamadas.push(chamada);
+        });
+      });
+
+      // Ordena desc por data + hora (simplificando pelo timestamp inserido no Firebase seria melhor)
+      todasChamadas.sort((a, b) => {
+        const timeA = new Date(a.data + ' ' + a.hora).getTime();
+        const timeB = new Date(b.data + ' ' + b.hora).getTime();
+        return timeB - timeA;
+      });
+
+      const ultimas5 = todasChamadas.slice(0,5);
+
+      listaChamadasUl.innerHTML = '';
+      ultimas5.forEach(ch => {
+        const li = document.createElement('li');
+        li.textContent = `${ch.nome} — ${ch.profissional} — ${ch.hora} ${ch.data}`;
+        listaChamadasUl.appendChild(li);
+      });
+    });
+  </script>
+</body>
+</html>
