@@ -7,114 +7,93 @@
     body {
       margin: 0;
       font-family: sans-serif;
-      background-color: #222;
+      background: black;
       color: white;
       display: flex;
       height: 100vh;
-      overflow: hidden;
-    }
-    #video-container {
-      width: 50%;
-      height: 100vh;
-      background: black;
     }
     iframe {
-      width: 100%;
+      width: 50%;
       height: 100%;
       border: none;
     }
-    #info-container {
+    #chamadasContainer {
       width: 50%;
       padding: 2em;
       box-sizing: border-box;
-      background: #0a3d62;
       display: flex;
       flex-direction: column;
-      justify-content: flex-start;
+      justify-content: center;
+      background: rgba(0,0,0,0.7);
     }
-    #chamadoAtual {
+    #chamadaAtual {
       font-size: 2.5rem;
-      font-weight: bold;
-      margin-bottom: 1em;
+      margin-bottom: 2rem;
+      text-align: center;
     }
     #ultimasChamadas {
-      margin-top: auto;
+      font-size: 1.2rem;
+      overflow-y: auto;
+      max-height: 50vh;
     }
     #ultimasChamadas h2 {
-      margin-bottom: 0.5em;
+      text-align: center;
+      margin-bottom: 1rem;
     }
     #ultimasChamadas ul {
       list-style: none;
       padding-left: 0;
-      max-height: 300px;
-      overflow-y: auto;
     }
     #ultimasChamadas li {
-      margin-bottom: 0.5em;
-      font-size: 1.1rem;
-      border-bottom: 1px solid #0e2a56;
-      padding-bottom: 0.3em;
+      padding: 0.3em 0;
+      border-bottom: 1px solid #444;
     }
   </style>
 </head>
 <body>
-  <div id="video-container">
-    <iframe src="https://www.youtube.com/embed/OPtRHSv2huE?autoplay=1&mute=1&loop=1&playlist=OPtRHSv2huE" allow="autoplay" allowfullscreen></iframe>
-  </div>
-  <div id="info-container">
-    <div id="chamadoAtual">Aguardando chamada...</div>
+
+  <iframe src="https://www.youtube.com/embed/OPtRHSv2huE?autoplay=1&mute=1&loop=1&playlist=OPtRHSv2huE" allow="autoplay"></iframe>
+
+  <div id="chamadasContainer">
+    <div id="chamadaAtual">Aguardando chamada...</div>
     <div id="ultimasChamadas">
-      <h2>Últimas 5 chamadas</h2>
-      <ul></ul>
+      <h2>Últimas 5 Chamadas</h2>
+      <ul id="listaUltimasChamadas"></ul>
     </div>
   </div>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
+  <script type="module">
+    import { db } from './firebase-config.js';
+    import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
-      authDomain: "painelcras-4890c.firebaseapp.com",
-      databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
-      projectId: "painelcras-4890c",
-      storageBucket: "painelcras-4890c.appspot.com",
-      messagingSenderId: "279841059682",
-      appId: "1:279841059682:web:be689ab69135f04cb4323b"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const chamadaAtualEl = document.getElementById('chamadaAtual');
+    const listaUltimasChamadasEl = document.getElementById('listaUltimasChamadas');
 
-    firebase.auth().signInAnonymously().catch(console.error);
-
-    const chamadoAtualDiv = document.getElementById('chamadoAtual');
-    const ultimasUl = document.querySelector('#ultimasChamadas ul');
-
-    // Atualiza o chamado atual na tela
-    db.ref('chamadoAtual').on('value', snapshot => {
+    // Escuta chamada atual
+    onValue(ref(db, 'chamadoAtual'), (snapshot) => {
       const data = snapshot.val();
-      if (!data) {
-        chamadoAtualDiv.textContent = "Aguardando chamada...";
-        return;
+      if (data && data.nome && data.profissional) {
+        chamadaAtualEl.innerHTML = `
+          <div><strong>${data.nome}</strong></div>
+          <div><em>${data.profissional}</em></div>
+          <div>${data.hora}</div>
+        `;
+      } else {
+        chamadaAtualEl.textContent = 'Aguardando chamada...';
       }
-      chamadoAtualDiv.textContent = `Chamando: ${data.nome} (Profissional: ${data.profissional}) às ${data.hora}`;
     });
 
-    // Atualiza últimas chamadas (limitando a 5)
-    db.ref('ultimasChamadas').on('value', snapshot => {
-      const chamadas = snapshot.val() || {};
-      // Ordena pela hora ou pela chave que é push id (ordem cronológica)
-      const lista = Object.values(chamadas);
-      // Últimos 5 já estão limitados no push do painel
-      ultimasUl.innerHTML = '';
-      lista.forEach(item => {
+    // Escuta últimas chamadas
+    onValue(ref(db, 'ultimasChamadas'), (snapshot) => {
+      const chamadas = snapshot.val() || [];
+      listaUltimasChamadasEl.innerHTML = '';
+      chamadas.forEach(chamada => {
         const li = document.createElement('li');
-        li.textContent = `${item.nome} - ${item.profissional} (${item.hora})`;
-        ultimasUl.appendChild(li);
+        li.textContent = `${chamada.nome} — ${chamada.profissional} (${chamada.hora} ${chamada.data})`;
+        listaUltimasChamadasEl.appendChild(li);
       });
     });
   </script>
+
 </body>
 </html>
