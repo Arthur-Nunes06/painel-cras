@@ -4,173 +4,130 @@
   <meta charset="UTF-8" />
   <title>Painel do Profissional</title>
   <style>
-    body {
-      background-color: #0a3d62;
-      color: white;
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2em;
-      min-height: 100vh;
-    }
-    h1 {
-      margin-bottom: 20px;
-    }
-    select, button {
-      font-size: 1.2rem;
-      margin: 10px;
-      padding: 10px 20px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #054a91;
-    }
-    #status {
-      margin-top: 1em;
-      font-size: 1.5rem;
-      min-height: 3em;
-    }
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1em; }
+    select, button { font-size: 1.2rem; padding: 0.5em; margin-top: 1em; width: 100%; }
+    #status { margin-top: 2em; font-size: 1.5rem; min-height: 2em; }
   </style>
 </head>
 <body>
-  <h1>Profissional - Chamar Pessoa</h1>
 
+  <h1>Painel do Profissional</h1>
   <label for="selectProfissional">Selecione seu nome:</label>
-  <select id="selectProfissional">
-    <option value="" disabled selected>-- Selecione seu profissional --</option>
-  </select>
+  <select id="selectProfissional"></select>
 
-  <button id="btnChamar">Chamar próximo</button>
-  <button id="btnFinalizar" disabled>Finalizar chamada</button>
+  <button id="btnChamar">Chamar Próximo</button>
+  <button id="btnFinalizar" disabled>Finalizar Chamada</button>
 
-  <div id="status"></div>
+  <div id="status">Aguardando chamada...</div>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
-      authDomain: "painelcras-4890c.firebaseapp.com",
-      databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
-      projectId: "painelcras-4890c",
-      storageBucket: "painelcras-4890c.appspot.com",
-      messagingSenderId: "279841059682",
-      appId: "1:279841059682:web:be689ab69135f04cb4323b"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    firebase.auth().signInAnonymously().catch(console.error);
+  <script type="module">
+    import { db } from './firebase-config.js';
+    import { ref, onValue, remove, set } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
 
     const selectProfissional = document.getElementById('selectProfissional');
+    const statusEl = document.getElementById('status');
     const btnChamar = document.getElementById('btnChamar');
     const btnFinalizar = document.getElementById('btnFinalizar');
-    const status = document.getElementById('status');
 
-    let profissionalSelecionado = null;
-    let chamadoAtual = null; // {id, nome, profissional}
+    let profissionalSelecionado = '';
+    let chamadoAtual = null;
 
-    // Atualiza lista profissionais
-    function atualizarProfissionais(profs) {
-      selectProfissional.innerHTML = '<option value="" disabled selected>-- Selecione seu profissional --</option>';
-      for (const key in profs) {
-        if (Object.hasOwnProperty.call(profs, key)) {
-          const nomeProf = profs[key];
-          const opt = document.createElement('option');
-          opt.value = nomeProf;
-          opt.textContent = nomeProf;
-          selectProfissional.appendChild(opt);
-        }
-      }
-    }
-
-    db.ref('profissionais').on('value', snapshot => {
+    // Carregar profissionais para select
+    const profRef = ref(db, 'profissionais');
+    onValue(profRef, (snapshot) => {
       const profs = snapshot.val() || {};
-      atualizarProfissionais(profs);
+      selectProfissional.innerHTML = '';
+      for (const nome of Object.values(profs)) {
+        const opt = document.createElement('option');
+        opt.value = nome;
+        opt.textContent = nome;
+        selectProfissional.appendChild(opt);
+      }
     });
 
-    selectProfissional.addEventListener('change', () => {
+    selectProfissional.onchange = () => {
       profissionalSelecionado = selectProfissional.value;
+      statusEl.textContent = 'Aguardando chamada...';
       chamadoAtual = null;
-      status.textContent = 'Profissional selecionado: ' + profissionalSelecionado;
       btnFinalizar.disabled = true;
-    });
+    };
 
-    btnChamar.addEventListener('click', () => {
+    btnChamar.onclick = () => {
       if (!profissionalSelecionado) {
-        alert('Selecione o profissional antes de chamar.');
+        alert('Selecione um profissional.');
         return;
       }
+      const filaRef = ref(db, `fila/${profissionalSelecionado}`);
 
-      const filaRef = db.ref('fila/' + profissionalSelecionado);
-
-      filaRef.orderByKey().limitToFirst(1).once('value', snapshot => {
+      // Buscar fila do profissional
+      onValue(filaRef, (snapshot) => {
         const fila = snapshot.val();
         if (!fila) {
-          status.textContent = "Fila vazia para " + profissionalSelecionado;
+          statusEl.textContent = 'Nenhum usuário na fila.';
           return;
         }
-        // Pega o primeiro usuário da fila
-        const [id, dados] = Object.entries(fila)[0];
-        chamadoAtual = { id, ...dados };
+        const chaves = Object.keys(fila).sort();
+        const primeiraChave = chaves[0];
+        const usuario = fila[primeiraChave].nome;
 
-        status.textContent = `Chamando: ${dados.nome} (Profissional: ${dados.profissional})`;
+        chamadoAtual = { chave: primeiraChave, nome: usuario, profissional: profissionalSelecionado };
+        statusEl.textContent = `Chamando: ${usuario}`;
 
-        // Salva chamado atual global no banco para a TV mostrar
-        db.ref('chamadoAtual').set({
-          id,
-          nome: dados.nome,
-          profissional: dados.profissional,
-          hora: new Date().toLocaleTimeString()
+        // Atualiza o chamadoAtual no banco
+        set(ref(db, 'chamadoAtual'), {
+          nome: usuario,
+          profissional: profissionalSelecionado,
+          hora: new Date().toLocaleTimeString('pt-BR'),
+          timestamp: Date.now()
         });
-
         btnFinalizar.disabled = false;
-      });
-    });
 
-    btnFinalizar.addEventListener('click', () => {
+        // Remover da fila
+        remove(ref(db, `fila/${profissionalSelecionado}/${primeiraChave}`));
+      }, { onlyOnce: true });
+    };
+
+    btnFinalizar.onclick = () => {
       if (!chamadoAtual) {
-        alert('Nenhuma chamada ativa para finalizar.');
+        alert('Nenhuma chamada para finalizar.');
         return;
       }
-      const filaRef = db.ref('fila/' + profissionalSelecionado + '/' + chamadoAtual.id);
-      filaRef.remove()
-        .then(() => {
-          status.textContent = `Finalizada chamada de ${chamadoAtual.nome}.`;
-          btnFinalizar.disabled = true;
+      // Adiciona na lista ultimas chamadas
+      const ultChamadasRef = ref(db, 'ultimasChamadas');
+      const novaChamada = {
+        nome: chamadoAtual.nome,
+        profissional: chamadoAtual.profissional,
+        hora: new Date().toLocaleTimeString('pt-BR'),
+        data: new Date().toLocaleDateString('pt-BR'),
+        timestamp: Date.now()
+      };
 
-          // Atualiza últimas chamadas
-          const ultimasRef = db.ref('ultimasChamadas');
-          const novaChamada = {
-            nome: chamadoAtual.nome,
-            profissional: chamadoAtual.profissional,
-            hora: new Date().toLocaleString()
-          };
-          // Push chamada nova e limita as últimas 5
-          ultimasRef.push(novaChamada).then(() => {
-            ultimasRef.once('value', snap => {
-              const chamadas = snap.val() || {};
-              const keys = Object.keys(chamadas);
-              if (keys.length > 5) {
-                // Remove a mais antiga (primeira)
-                ultimasRef.child(keys[0]).remove();
-              }
-            });
-          });
+      // Obter últimas chamadas, adicionar nova e limitar a 5
+      onValue(ultChamadasRef, (snapshot) => {
+        let ultimas = snapshot.val() || [];
+        ultimas = ultimas.filter(ch => ch.timestamp !== undefined);
+        ultimas.push(novaChamada);
+        ultimas.sort((a,b) => b.timestamp - a.timestamp);
+        if (ultimas.length > 5) ultimas.pop();
+        set(ultChamadasRef, ultimas);
+      }, { onlyOnce: true });
 
-          // Remove o chamadoAtual global no DB
-          db.ref('chamadoAtual').remove();
-          chamadoAtual = null;
-        })
-        .catch(e => alert('Erro ao finalizar chamada: ' + e.message));
-    });
+      statusEl.textContent = 'Chamada finalizada.';
+      btnFinalizar.disabled = true;
+      chamadoAtual = null;
 
+      // Limpa chamadoAtual no banco
+      set(ref(db, 'chamadoAtual'), null);
+    };
+
+    // Inicializa seleção e estado
+    setTimeout(() => {
+      if (selectProfissional.options.length > 0) {
+        selectProfissional.selectedIndex = 0;
+        profissionalSelecionado = selectProfissional.value;
+      }
+    }, 500);
   </script>
+
 </body>
 </html>
