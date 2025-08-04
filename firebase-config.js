@@ -4,7 +4,7 @@ const firebaseConfig = {
   authDomain: "painelcras-4890c.firebaseapp.com",
   databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
   projectId: "painelcras-4890c",
-  storageBucket: "painelcras-4890c.firebasestorage.app",
+  storageBucket: "painelcras-4890c.appspot.com",
   messagingSenderId: "279841059682",
   appId: "1:279841059682:web:be689ab69135f04cb4323b"
 };
