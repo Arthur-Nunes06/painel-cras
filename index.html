@@ -1,75 +1,118 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>Cadastro - CRAS</title>
+  <meta charset="UTF-8">
+  <title>Cadastro de Atendimento - CRAS</title>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      max-width: 600px;
+      margin: auto;
+    }
+    h2 { margin-top: 2rem; }
+    input, select, button {
+      display: block;
+      margin-top: 1rem;
+      padding: 0.5rem;
+      font-size: 1rem;
+      width: 100%;
+    }
+    ul { list-style: none; padding: 0; }
+    li { margin: 0.5rem 0; }
+    .prof-item { display: flex; justify-content: space-between; }
+  </style>
 </head>
-<body style="font-family:sans-serif; text-align:center; padding:2em;">
+<body>
   <h1>Cadastro de Atendimento</h1>
 
-  <h2>Cadastrar Usuário na Fila</h2>
-  <input type="text" id="nomeUsuario" placeholder="Nome do usuário" />
-  <select id="listaProfissionais"></select>
-  <button onclick="cadastrarUsuario()">Cadastrar</button>
-
-  <h2>Gerenciar Profissionais</h2>
-  <input type="text" id="nomeProfissional" placeholder="Nome do profissional" />
+  <h2>👨‍⚕️ Profissionais</h2>
+  <input type="text" id="novoProfissional" placeholder="Nome do profissional">
   <button onclick="adicionarProfissional()">Adicionar Profissional</button>
-  <ul id="profissionaisList"></ul>
 
-  <script type="module">
-    import { db } from './firebase-config.js';
-    import {
-      ref, push, set, onValue, remove
-    } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
+  <ul id="listaProfissionais"></ul>
 
-    const listaProfissionais = document.getElementById('listaProfissionais');
-    const profissionaisList = document.getElementById('profissionaisList');
+  <h2>🙋 Cadastro de Usuário</h2>
+  <input type="text" id="nomeUsuario" placeholder="Nome do usuário">
+  <select id="selectProfissional">
+    <option value="">Selecione um profissional</option>
+  </select>
+  <button onclick="cadastrarUsuario()">Cadastrar na Fila</button>
 
-    function atualizarListaProfissionais() {
-      const profRef = ref(db, 'profissionais');
-      onValue(profRef, (snapshot) => {
-        listaProfissionais.innerHTML = '';
-        profissionaisList.innerHTML = '';
-        snapshot.forEach(child => {
-          const key = child.key;
-          const nome = child.val();
-          const option = document.createElement('option');
-          option.value = nome;
-          option.textContent = nome;
-          listaProfissionais.appendChild(option);
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyChT_LbedW9M1lsyK26HUCCDCcJc4hoQf4",
+      authDomain: "painelcras-4890c.firebaseapp.com",
+      databaseURL: "https://painelcras-4890c-default-rtdb.firebaseio.com",
+      projectId: "painelcras-4890c",
+      storageBucket: "painelcras-4890c.appspot.com",
+      messagingSenderId: "279841059682",
+      appId: "1:279841059682:web:be689ab69135f04cb4323b"
+    };
 
-          const li = document.createElement('li');
-          li.textContent = nome;
-          const btn = document.createElement('button');
-          btn.textContent = 'Remover';
-          btn.onclick = () => remove(ref(db, 'profissionais/' + key));
-          li.appendChild(btn);
-          profissionaisList.appendChild(li);
-        });
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    firebase.auth().signInAnonymously();
+
+    const listaProfissionais = document.getElementById("listaProfissionais");
+    const selectProfissional = document.getElementById("selectProfissional");
+
+    function carregarProfissionais() {
+      db.ref("profissionais").on("value", snapshot => {
+        listaProfissionais.innerHTML = "";
+        selectProfissional.innerHTML = `<option value="">Selecione um profissional</option>`;
+        const dados = snapshot.val();
+        if (dados) {
+          Object.keys(dados).forEach(id => {
+            const nome = dados[id];
+            // Adiciona ao <ul>
+            const li = document.createElement("li");
+            li.className = "prof-item";
+            li.innerHTML = `${nome} <button onclick="removerProfissional('${id}')">Remover</button>`;
+            listaProfissionais.appendChild(li);
+            // Adiciona ao <select>
+            const opt = document.createElement("option");
+            opt.value = nome;
+            opt.textContent = nome;
+            selectProfissional.appendChild(opt);
+          });
+        }
       });
     }
 
     function adicionarProfissional() {
-      const nome = document.getElementById('nomeProfissional').value.trim();
-      if (!nome) return alert('Digite o nome do profissional');
-      const profRef = ref(db, 'profissionais');
-      const novo = push(profRef);
-      set(novo, nome);
-      document.getElementById('nomeProfissional').value = '';
+      const nome = document.getElementById("novoProfissional").value.trim();
+      if (!nome) return alert("Digite um nome válido");
+      const novoRef = db.ref("profissionais").push();
+      novoRef.set(nome).then(() => {
+        document.getElementById("novoProfissional").value = "";
+      });
+    }
+
+    function removerProfissional(id) {
+      if (confirm("Tem certeza que deseja remover este profissional?")) {
+        db.ref("profissionais/" + id).remove();
+      }
     }
 
     function cadastrarUsuario() {
-      const nome = document.getElementById('nomeUsuario').value.trim();
-      const profissional = listaProfissionais.value;
-      if (!nome || !profissional) return alert('Preencha todos os campos');
-      const filaRef = ref(db, `fila/${profissional}/${Date.now()}`);
-      set(filaRef, { nome });
-      document.getElementById('nomeUsuario').value = '';
-      alert('Usuário cadastrado na fila!');
+      const nome = document.getElementById("nomeUsuario").value.trim();
+      const profissional = document.getElementById("selectProfissional").value;
+      if (!nome || !profissional) return alert("Preencha todos os campos");
+
+      const filaRef = db.ref("fila/" + profissional);
+      const id = Date.now();
+      filaRef.child(id).set({ nome }).then(() => {
+        alert("Usuário cadastrado na fila!");
+        document.getElementById("nomeUsuario").value = "";
+      });
     }
 
-    atualizarListaProfissionais();
+    carregarProfissionais();
   </script>
 </body>
 </html>
